@@ -1,5 +1,210 @@
+from typing import NoReturn, Optional
+from enums import (SpeechSynthesisOutputFormat, ResultReason,
+                   CancellationReason, CancellationErrorCode)
+from xml.sax.saxutils import escape
+
+
+class AudioOutputStream():
+    """
+    Base class for Output Streams
+    """
+
+
+class AutoDetectSourceLanguageConfig:
+    "Not implemented"
+
+
+class ResultFuture():
+    """
+    The result of an asynchronous operation.
+    """
+
+    def __init__(self, async_handle):
+        """
+        private constructor
+        """
+        self._handle = async_handle
+
+    def get(self):
+        """
+        Waits until the result is available, and returns it.
+        """
+        if not self.__resolved:
+            result_handle = self.__get_function(self._handle)
+            if self.__wrapped_type is not None:
+                self.__result = self.__wrapped_type(result_handle)
+            self.__resolved = True
+        return self.__result if self.__wrapped_type is not None else None
+
+
+class SpeechSynthesisCancellationDetails():
+    """
+    Contains detailed information about why a result was canceled.
+    """
+
+    def __init__(self, result: Optional["SpeechSynthesisResult"] = None):
+        if result is not None:
+            self.__reason = CancellationReason(out_enum.value)
+            self.__error_code = CancellationErrorCode(out_enum.value)
+            self.__error_details = result.properties.get_property(
+                PropertyId.CancellationDetails_ReasonDetailedText)
+
+    @property
+    def reason(self) -> CancellationErrorCode:
+        """
+        The reason the result was canceled.
+        """
+        return self.__reason
+
+    @property
+    def error_code(self) -> CancellationErrorCode:
+        """
+        The error code in case of an unsuccessful speech synthesis (Reason is set to Error).
+        If Reason is not Error, ErrorCode is set to NoError.
+        """
+        return self.__error_code
+
+    @property
+    def error_details(self) -> str:
+        """
+        The error message in case of an unsuccessful speech synthesis (Reason is set to Error)
+        """
+        return self.__error_details
+
+
+class SpeechSynthesisResult():
+    """
+    Result of a speech synthesis operation.
+    """
+
+    def __init__(self):
+        """
+        Constructor for internal use.
+        """
+        self._result_id = _c_string_buffer.value.decode(encoding='utf-8')
+        self._reason = ResultReason(enum_out.value)
+        self._audio_duration_milliseconds = timedelta(
+            milliseconds=c_duration.value)
+        self._audio_data = buffer
+        self._cancellation_details = SpeechSynthesisCancellationDetails(
+            result=self) if self._reason == ResultReason.Canceled else None
+
+    @property
+    def cancellation_details(self) -> SpeechSynthesisCancellationDetails:
+        """
+        The reason why speech synthesis was cancelled.
+
+        Returns `None` if there was no cancellation.
+        """
+        return self._cancellation_details
+
+    @property
+    def result_id(self) -> str:
+        """
+        Synthesis result unique ID.
+        """
+        return self._result_id
+
+    @property
+    def reason(self) -> "ResultReason":
+        """
+        Synthesis reason.
+        """
+        return self._reason
+
+    @property
+    def audio_data(self) -> bytes:
+        """
+        The output audio data from the TTS.
+        """
+        return self._audio_data
+
+    @property
+    def audio_duration(self) -> timedelta:
+        """
+        The time duration of the synthesized audio.
+
+        .. note::
+          Added in version 1.21.0.
+        """
+        return self._audio_duration_milliseconds
+
+    @property
+    def properties(self) -> NoReturn:
+        """
+        Unsupported
+        """
+        raise NotImplementedError("properties unsupported")
+
+    def __str__(self):
+        return u'{}(result_id={}, reason={}, audio_length={})'.format(
+            type(self).__name__, self._result_id, self._reason, len(self._audio_data))
+
+
+class SpeechConfig():
+    """
+    Class that defines configurations for speech synthesis.
+    Several configurations is not supported.
+    """
+
+    def __init__(self):
+        self._speech_synthesis_language = ""
+        self._speech_synthesis_voice_name = ""
+        self._speech_synthesis_output_format_string = "Riff24Khz16BitMonoPcm"
+
+    @property
+    def speech_synthesis_language(self) -> str:
+        """
+        Get speech synthesis language.
+        """
+        return self._speech_synthesis_language
+
+    @speech_synthesis_language.setter
+    def speech_synthesis_language(self, language: str):
+        """
+        Set speech synthesis language.
+
+        :param language: The language for speech synthesis (e.g. en-US).
+        """
+        self._speech_synthesis_language = language
+
+    @property
+    def speech_synthesis_voice_name(self) -> str:
+        """
+        Get speech synthesis voice name.
+        """
+        return self._speech_synthesis_voice_name
+
+    @speech_synthesis_voice_name.setter
+    def speech_synthesis_voice_name(self, voice: str):
+        """
+        Set speech synthesis voice name.
+
+        :param voice: The name of voice for speech synthesis.
+        """
+        self._speech_synthesis_voice_name = voice
+
+    @property
+    def speech_synthesis_output_format_string(self) -> str:
+        """
+        Get speech synthesis output audio format string.
+        """
+        return self._speech_synthesis_output_format_string
+
+    def set_speech_synthesis_output_format(self, format_id: SpeechSynthesisOutputFormat):
+        """
+        Set speech synthesis output audio format.
+
+        :param format_id: The audio format id, e.g. Riff16Khz16BitMonoPcm.
+        """
+        if not isinstance(format_id, SpeechSynthesisOutputFormat):
+            raise TypeError('wrong type, must be SpeechSynthesisOutputFormat')
+        self._speech_synthesis_output_format_string = format_id.name
+
+
 class AudioOutputConfig():
     """
+    Copied from azure.cognitiveservices.audio
     Represents specific audio configuration, such as audio output device, file, or custom audio streams
 
     Generates an audio configuration for the speech synthesizer. Only one argument can be
@@ -8,39 +213,448 @@ class AudioOutputConfig():
     :param use_default_speaker: Specifies to use the system default speaker for audio
         output.
     :param filename: Specifies an audio output file. The parent directory must already exist.
-    :param stream: Creates an AudioOutputConfig object representing the specified stream.
+    [UNSUPPORT]:param stream: Creates an AudioOutputConfig object representing the specified stream.
     :param device_name: Specifies the id of the audio device to use.
          This functionality was added in version 1.17.0.
     """
 
-    def __init__(self, use_default_speaker: bool = False, filename: str = None,
-                 stream: AudioOutputStream = None, device_name: str = None):
+    def __init__(self, use_default_speaker: Optional[bool] = False, filename: Optional[str] = None,
+                 stream: Optional[AudioOutputStream] = None, device_name: Optional[str] = None):
         if not isinstance(use_default_speaker, bool):
             raise ValueError('use_default_speaker must be a bool, is "{}"'.format(
                 use_default_speaker))
-        handle = _spx_handle(0)
+        if stream is None:
+            raise NotImplementedError("`stream` has not been implemented")
         if filename is None and stream is None and device_name is None:
             if use_default_speaker:
-                _call_hr_fn(fn=_sdk_lib.audio_config_create_audio_output_from_default_speaker, *[ctypes.byref(handle)])
+                # Default speaker
+                pass
             else:
-                raise ValueError('default speaker needs to be explicitly activated')
+                raise ValueError(
+                    'default speaker needs to be explicitly activated')
         else:
             if sum(x is not None for x in (filename, stream, device_name)) > 1:
-                raise ValueError('only one of filename, stream, and device_name can be given')
+                raise ValueError(
+                    'only one of filename, stream, and device_name can be given')
 
             if filename is not None:
-                c_filename = _c_str(filename)
-                _call_hr_fn(fn=_sdk_lib.audio_config_create_audio_output_from_wav_file_name, *[ctypes.byref(handle), c_filename])
+                # filename
+                pass
             elif stream is not None:
-                self._stream = stream
-                _call_hr_fn(fn=_sdk_lib.audio_config_create_audio_output_from_stream, *[ctypes.byref(handle), stream._handle])
+                pass
+                # self._stream = stream
+                # _call_hr_fn(fn=_sdk_lib.audio_config_create_audio_output_from_stream,
+                #             *[ctypes.byref(handle), stream._handle])
             elif device_name is not None:
-                c_device = _c_str(device_name)
-                _call_hr_fn(fn=_sdk_lib.audio_config_create_audio_output_from_a_speaker, *[ctypes.byref(handle), c_device])
+                # detected device name
+                pass
             else:
-                raise ValueError('cannot construct AudioOutputConfig with the given arguments')
-        self.__handle = _Handle(handle, _sdk_lib.audio_config_is_handle_valid, _sdk_lib.audio_config_release)
+                raise ValueError(
+                    'cannot construct AudioOutputConfig with the given arguments')
 
     @property
-    def _handle(self) -> _spx_handle:
-        return self.__handle.get()
+    def handle(self):
+        pass
+
+
+class SpeechSynthesizer:
+    """
+    A speech synthesizer.
+
+    :param speech_config: The config for the speech synthesizer
+    :param audio_config: The config for the audio output.
+        This parameter is optional.
+        If it is not provided, the default speaker device will be used for audio output.
+        If it is None, the output audio will be dropped.
+        None can be used for scenarios like performance test.
+    [NOTSUPPORT]:param auto_detect_source_language_config: The auto detection source language config
+    """
+
+    def __init__(self, speech_config: SpeechConfig,
+                 audio_config: Optional[AudioOutputConfig] = AudioOutputConfig(
+                     use_default_speaker=True),
+                 auto_detect_source_language_config: Optional[AutoDetectSourceLanguageConfig] = None):
+
+        self._speech_config = speech_config
+        self._audio_config = audio_config
+        if auto_detect_source_language_config is not None:
+            raise NotImplementedError(
+                'auto_detect_source_language_config is not supported')
+
+    def _build_ssml(self, text: str) -> str:
+        """
+        Copied from aspeak.ssml
+        Create SSML for text to be spoken.
+        """
+        voice = self._speech_config.speech_synthesis_language
+        ssml = '<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" ' \
+            'xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"> '
+        ssml += f'<voice name="{voice}">' if voice is not None else '<voice>'
+        ssml += escape(text)
+        ssml += '</voice></speak>'
+        return ssml
+
+    def speak_text(self, text: str) -> SpeechSynthesisResult:
+        """
+        Performs synthesis on plain text in a blocking (synchronous) mode.
+
+        :returns: A SpeechSynthesisResult.
+        """
+        self.speak_text_async(text).get()
+
+    def speak_ssml(self, ssml: str) -> SpeechSynthesisResult:
+        """
+        Performs synthesis on ssml in a blocking (synchronous) mode.
+
+        :returns: A SpeechSynthesisResult.
+        """
+        self.speak_ssml_async(ssml).get()
+
+    def speak_text_async(self, text: str) -> ResultFuture:
+        """
+        Performs synthesis on plain text in a non-blocking (asynchronous) mode.
+
+        :returns: A future with SpeechSynthesisResult.
+        """
+        ssml = self._build_ssml(text)
+        return ResultFuture(async_handle, resolve_future, SpeechSynthesisResult)
+
+    def speak_ssml_async(self, ssml: str) -> ResultFuture:
+        """
+        Performs synthesis on ssml in a non-blocking (asynchronous) mode.
+
+        :returns: A future with SpeechSynthesisResult.
+        """
+        async_handle = _spx_handle(0)
+        c_ssml = _c_str(ssml)
+        ssml_length = ctypes.c_uint32(len(c_ssml))
+        _call_hr_fn(fn=_sdk_lib.synthesizer_speak_ssml_async, *
+                    [self._handle, c_ssml, ssml_length, ctypes.byref(async_handle)])
+
+        def resolve_future(handle: _spx_handle):
+            result_handle = _spx_handle(0)
+            _call_hr_fn(fn=_sdk_lib.synthesizer_speak_async_wait_for,
+                        *[handle, max_uint32, ctypes.byref(result_handle)])
+            _sdk_lib.synthesizer_async_handle_release(handle)
+            return result_handle
+        return ResultFuture(async_handle, resolve_future, SpeechSynthesisResult)
+
+    def start_speaking_text(self, text: str) -> SpeechSynthesisResult:
+        """
+        Starts synthesis on plain text in a blocking (synchronous) mode.
+
+        :returns: A SpeechSynthesisResult.
+        """
+        return self.start_speaking_text_async(text).get()
+
+    def start_speaking_ssml(self, ssml: str) -> SpeechSynthesisResult:
+        """
+        Starts synthesis on ssml in a blocking (synchronous) mode.
+
+        :returns: A SpeechSynthesisResult.
+        """
+        return self.start_speaking_ssml_async(ssml).get()
+
+    def start_speaking_text_async(self, text: str) -> ResultFuture:
+        """
+        Starts synthesis on plain text in a non-blocking (asynchronous) mode.
+
+        :returns: A future with SpeechSynthesisResult.
+        """
+        async_handle = _spx_handle(0)
+        c_text = _c_str(text)
+        c_length = ctypes.c_uint32(len(c_text))
+        _call_hr_fn(fn=_sdk_lib.synthesizer_start_speaking_text_async,
+                    *[self._handle, c_text, c_length, ctypes.byref(async_handle)])
+
+        def resolve_future(handle: _spx_handle):
+            result_handle = _spx_handle(0)
+            _call_hr_fn(fn=_sdk_lib.synthesizer_speak_async_wait_for,
+                        *[handle, max_uint32, ctypes.byref(result_handle)])
+            _sdk_lib.synthesizer_async_handle_release(handle)
+            return result_handle
+        return ResultFuture(async_handle, resolve_future, SpeechSynthesisResult)
+
+    def start_speaking_ssml_async(self, ssml: str) -> ResultFuture:
+        """
+        Starts synthesis on ssml in a non-blocking (asynchronous) mode.
+
+        :returns: A future with SpeechSynthesisResult.
+        """
+        async_handle = _spx_handle(0)
+        c_ssml = _c_str(ssml)
+        c_length = ctypes.c_uint32(len(c_ssml))
+        _call_hr_fn(fn=_sdk_lib.synthesizer_start_speaking_ssml_async,
+                    *[self._handle, c_ssml, c_length, ctypes.byref(async_handle)])
+
+        def resolve_future(handle: _spx_handle):
+            result_handle = _spx_handle(0)
+            _call_hr_fn(fn=_sdk_lib.synthesizer_speak_async_wait_for,
+                        *[handle, max_uint32, ctypes.byref(result_handle)])
+            _sdk_lib.synthesizer_async_handle_release(handle)
+            return result_handle
+        return ResultFuture(async_handle, resolve_future, SpeechSynthesisResult)
+
+    def stop_speaking_async(self):
+        """
+        Asynchronously terminates ongoing synthesis operation.
+        This method will stop playback and clear unread data in PullAudioOutputStream.
+
+        :returns: A future that is fulfilled once synthesis has been stopped.
+        """
+        async_handle = _spx_handle(0)
+        _call_hr_fn(fn=_sdk_lib.synthesizer_stop_speaking_async,
+                    *[self._handle, ctypes.byref(async_handle)])
+
+        def resolve_future(handle: _spx_handle):
+            _call_hr_fn(
+                fn=_sdk_lib.synthesizer_stop_speaking_async_wait_for, *[handle, max_uint32])
+            _sdk_lib.synthesizer_async_handle_release(handle)
+            return None
+        return ResultFuture(async_handle, resolve_future, None)
+
+    def stop_speaking(self):
+        """
+        Synchronously terminates ongoing synthesis operation.
+        This method will stop playback and clear unread data in PullAudioOutputStream.
+        """
+        self.stop_speaking_async().get()
+
+    def get_voices_async(self, locale: str = "") -> ResultFuture:
+        """
+        Get the available voices, asynchronously.
+
+        :param locale: Specify the locale of voices, in BCP-47 format; or leave it empty to get all available voices.
+        :returns: A task representing the asynchronous operation that gets the voices.
+        """
+        async_handle = _spx_handle(0)
+        c_locale = _c_str(locale)
+        _call_hr_fn(fn=_sdk_lib.synthesizer_get_voices_list_async,
+                    *[self._handle, c_locale, ctypes.byref(async_handle)])
+
+        def resolve_future(handle: _spx_handle):
+            result_handle = _spx_handle(0)
+            _call_hr_fn(fn=_sdk_lib.synthesizer_get_voices_list_async_wait_for,
+                        *[handle, max_uint32, ctypes.byref(result_handle)])
+            _sdk_lib.synthesizer_async_handle_release(handle)
+            return result_handle
+        return ResultFuture(async_handle, resolve_future, SynthesisVoicesResult)
+
+    @property
+    def properties(self) -> PropertyCollection:
+        """
+        A collection of properties and their values defined for this SpeechSynthesizer.
+        """
+        return self.__properties
+
+    @property
+    def authorization_token(self) -> str:
+        """
+        The authorization token that will be used for connecting to the service.
+
+        .. note::
+          The caller needs to ensure that the authorization token is valid. Before the
+          authorization token expires, the caller needs to refresh it by calling this setter with a
+          new valid token. Otherwise, the synthesizer will encounter errors while speech synthesis.
+        """
+        return self.properties.get_property(PropertyId.SpeechServiceAuthorization_Token)
+
+    @authorization_token.setter
+    def authorization_token(self, authorization_token: str):
+        self.properties.set_property(
+            PropertyId.SpeechServiceAuthorization_Token, authorization_token)
+
+    __synthesis_started_signal = None
+
+    @property
+    def synthesis_started(self) -> EventSignal:
+        """
+        Signal for events indicating synthesis has started.
+
+        Callbacks connected to this signal are called with a :class:`.SpeechSynthesisEventArgs`
+        instance as the single argument.
+        """
+        def synthesis_started_connection(signal: EventSignal, handle: _spx_handle):
+            callback = SpeechSynthesizer.__synthesis_started_callback if signal.is_connected() else None
+            _sdk_lib.synthesizer_started_set_callback(
+                handle, callback, signal._context_ptr)
+        if self.__synthesis_started_signal is None:
+            self.__synthesis_started_signal = EventSignal(
+                self, synthesis_started_connection)
+        return self.__synthesis_started_signal
+
+    @ctypes.CFUNCTYPE(None, _spx_handle, _spx_handle, ctypes.c_void_p)
+    def __synthesis_started_callback(reco_handle: _spx_handle, event_handle: _spx_handle, context: ctypes.c_void_p):
+        event_handle = _spx_handle(event_handle)
+        obj = _unpack_context(context)
+        if obj is not None:
+            event = SpeechSynthesisEventArgs(event_handle)
+            obj.__synthesis_started_signal.signal(event)
+
+    __synthesizing_signal = None
+
+    @property
+    def synthesizing(self) -> EventSignal:
+        """
+        Signal for events indicating synthesis is ongoing.
+
+        Callbacks connected to this signal are called with a :class:`.SpeechSynthesisEventArgs`
+        instance as the single argument.
+        """
+        def synthesizing_connection(signal: EventSignal, handle: _spx_handle):
+            callback = SpeechSynthesizer.__synthesizing_callback if signal.is_connected() else None
+            _sdk_lib.synthesizer_synthesizing_set_callback(
+                handle, callback, signal._context_ptr)
+        if self.__synthesizing_signal is None:
+            self.__synthesizing_signal = EventSignal(
+                self, synthesizing_connection)
+        return self.__synthesizing_signal
+
+    @ctypes.CFUNCTYPE(None, _spx_handle, _spx_handle, ctypes.c_void_p)
+    def __synthesizing_callback(reco_handle: _spx_handle, event_handle: _spx_handle, context: ctypes.c_void_p):
+        event_handle = _spx_handle(event_handle)
+        obj = _unpack_context(context)
+        if obj is not None:
+            event = SpeechSynthesisEventArgs(event_handle)
+            obj.__synthesizing_signal.signal(event)
+
+    __synthesis_completed_signal = None
+
+    @property
+    def synthesis_completed(self) -> EventSignal:
+        """
+        Signal for events indicating synthesis has completed.
+
+        Callbacks connected to this signal are called with a :class:`.SpeechSynthesisEventArgs`
+        instance as the single argument.
+        """
+        def synthesis_completed_connection(signal: EventSignal, handle: _spx_handle):
+            callback = SpeechSynthesizer.__synthesis_completed_callback if signal.is_connected() else None
+            _sdk_lib.synthesizer_completed_set_callback(
+                handle, callback, signal._context_ptr)
+        if self.__synthesis_completed_signal is None:
+            self.__synthesis_completed_signal = EventSignal(
+                self, synthesis_completed_connection)
+        return self.__synthesis_completed_signal
+
+    @ctypes.CFUNCTYPE(None, _spx_handle, _spx_handle, ctypes.c_void_p)
+    def __synthesis_completed_callback(reco_handle: _spx_handle, event_handle: _spx_handle, context: ctypes.c_void_p):
+        event_handle = _spx_handle(event_handle)
+        obj = _unpack_context(context)
+        if obj is not None:
+            event = SpeechSynthesisEventArgs(event_handle)
+            obj.__synthesis_completed_signal.signal(event)
+
+    __synthesis_canceled_signal = None
+
+    @property
+    def synthesis_canceled(self) -> EventSignal:
+        """
+        Signal for events indicating synthesis has been canceled.
+
+        Callbacks connected to this signal are called with a :class:`.SpeechSynthesisEventArgs`
+        instance as the single argument.
+        """
+        def synthesis_canceled_connection(signal: EventSignal, handle: _spx_handle):
+            callback = SpeechSynthesizer.__synthesis_canceled_callback if signal.is_connected() else None
+            _sdk_lib.synthesizer_canceled_set_callback(
+                handle, callback, signal._context_ptr)
+        if self.__synthesis_canceled_signal is None:
+            self.__synthesis_canceled_signal = EventSignal(
+                self, synthesis_canceled_connection)
+        return self.__synthesis_canceled_signal
+
+    @ctypes.CFUNCTYPE(None, _spx_handle, _spx_handle, ctypes.c_void_p)
+    def __synthesis_canceled_callback(reco_handle: _spx_handle, event_handle: _spx_handle, context: ctypes.c_void_p):
+        event_handle = _spx_handle(event_handle)
+        obj = _unpack_context(context)
+        if obj is not None:
+            event = SpeechSynthesisEventArgs(event_handle)
+            obj.__synthesis_canceled_signal.signal(event)
+
+    __synthesis_word_boundary_signal = None
+
+    @property
+    def synthesis_word_boundary(self) -> EventSignal:
+        """
+        Signal for events indicating a word boundary.
+
+        Callbacks connected to this signal are called with a :class:`.SpeechSynthesisWordBoundaryEventArgs`
+        instance as the single argument.
+        """
+        def synthesis_word_boundary_connection(signal: EventSignal, handle: _spx_handle):
+            callback = SpeechSynthesizer.__synthesis_word_boundary_callback if signal.is_connected() else None
+            _sdk_lib.synthesizer_word_boundary_set_callback(
+                handle, callback, signal._context_ptr)
+        if self.__synthesis_word_boundary_signal is None:
+            self.__synthesis_word_boundary_signal = EventSignal(
+                self, synthesis_word_boundary_connection)
+        return self.__synthesis_word_boundary_signal
+
+    @ctypes.CFUNCTYPE(None, _spx_handle, _spx_handle, ctypes.c_void_p)
+    def __synthesis_word_boundary_callback(reco_handle: _spx_handle, event_handle: _spx_handle, context: ctypes.c_void_p):
+        event_handle = _spx_handle(event_handle)
+        obj = _unpack_context(context)
+        if obj is not None:
+            event = SpeechSynthesisWordBoundaryEventArgs(event_handle)
+            obj.__synthesis_word_boundary_signal.signal(event)
+
+    __viseme_received_signal = None
+
+    @property
+    def viseme_received(self) -> EventSignal:
+        """
+        Signal for events indicating a viseme is received.
+
+        Callbacks connected to this signal are called with a :class:`.SpeechSynthesisVisemeEventArgs`
+        instance as the single argument.
+
+        .. note::
+            Added in version 1.16.0.
+        """
+        def viseme_received_connection(signal: EventSignal, handle: _spx_handle):
+            callback = SpeechSynthesizer.__viseme_received_callback if signal.is_connected() else None
+            _sdk_lib.synthesizer_viseme_received_set_callback(
+                handle, callback, signal._context_ptr)
+        if self.__viseme_received_signal is None:
+            self.__viseme_received_signal = EventSignal(
+                self, viseme_received_connection)
+        return self.__viseme_received_signal
+
+    @ctypes.CFUNCTYPE(None, _spx_handle, _spx_handle, ctypes.c_void_p)
+    def __viseme_received_callback(reco_handle: _spx_handle, event_handle: _spx_handle, context: ctypes.c_void_p):
+        event_handle = _spx_handle(event_handle)
+        obj = _unpack_context(context)
+        if obj is not None:
+            event = SpeechSynthesisVisemeEventArgs(event_handle)
+            obj.__viseme_received_signal.signal(event)
+
+    __bookmark_reached_signal = None
+
+    @property
+    def bookmark_reached(self) -> EventSignal:
+        """
+        Signal for events indicating a bookmark is reached.
+
+        Callbacks connected to this signal are called with a :class:`.SpeechSynthesisBookmarkEventArgs`
+        instance as the single argument.
+
+        .. note::
+            Added in version 1.16.0.
+        """
+        def bookmark_reached_connection(signal: EventSignal, handle: _spx_handle):
+            callback = SpeechSynthesizer.__bookmark_reached_callback if signal.is_connected() else None
+            _sdk_lib.synthesizer_bookmark_reached_set_callback(
+                handle, callback, signal._context_ptr)
+        if self.__bookmark_reached_signal is None:
+            self.__bookmark_reached_signal = EventSignal(
+                self, bookmark_reached_connection)
+        return self.__bookmark_reached_signal
+
+    @ctypes.CFUNCTYPE(None, _spx_handle, _spx_handle, ctypes.c_void_p)
+    def __bookmark_reached_callback(reco_handle: _spx_handle, event_handle: _spx_handle, context: ctypes.c_void_p):
+        event_handle = _spx_handle(event_handle)
+        obj = _unpack_context(context)
+        if obj is not None:
+            event = SpeechSynthesisBookmarkEventArgs(event_handle)
+            obj.__bookmark_reached_signal.signal(event)

@@ -2,21 +2,12 @@
 # A completely innocent attempt to borrow proprietary Microsoft technology for a much better TTS experience
 import requests
 import websockets
+from websockets.legacy import client
 import asyncio
 from datetime import datetime
 import time
 import re
 import uuid
-import argparse
-
-
-'''命令行参数解析'''
-def parseArgs():
-    parser = argparse.ArgumentParser(description='text2speech')
-    parser.add_argument('--input', dest='input', help='SSML(语音合成标记语言)的路径', type=str, required=True)
-    parser.add_argument('--output', dest='output', help='保存mp3文件的路径', type=str, required=False)
-    args = parser.parse_args()
-    return args
 
 # Generate X-Timestamp all correctly formatted
 def getXTime():
@@ -49,7 +40,7 @@ async def transferMsTTSData(SSML_text, outputPath):
         Auth_Token + "&X-ConnectionId=" + req_id
     # 目前该接口没有认证可能很快失效
     # endpoint2 = f"wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId={req_id}"
-    async with websockets.connect(endpoint2,extra_headers={'Origin':'https://azure.microsoft.com'}) as websocket:
+    async with client.connect(endpoint2,extra_headers={'Origin':'https://azure.microsoft.com'}) as websocket:
         payload_1 = '{"context":{"system":{"name":"SpeechSDK","version":"1.12.1-rc.1","build":"JavaScript","lang":"JavaScript","os":{"platform":"Browser/Linux x86_64","name":"Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0","version":"5.0 (X11)"}}}}'
         message_1 = 'Path : speech.config\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
             getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_1
@@ -93,10 +84,5 @@ async def mainSeq(SSML_text, outputPath):
     await transferMsTTSData(SSML_text, outputPath)
 
 if __name__ == "__main__":
-    args = parseArgs()
-    SSML_text = get_SSML(args.input)
     output_path = args.output if args.output else 'output_'+ str(int(time.time()*1000))
     asyncio.get_event_loop().run_until_complete(mainSeq(SSML_text, output_path))
-    print('completed')
-    # python tts.py --input SSML.xml
-    # python tts.py --input SSML.xml --output 保存文件名
