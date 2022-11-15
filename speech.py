@@ -1,7 +1,13 @@
-from typing import NoReturn, Optional
+from typing import NoReturn, Optional, Union
 from enums import (SpeechSynthesisOutputFormat, ResultReason,
                    CancellationReason, CancellationErrorCode)
 from xml.sax.saxutils import escape
+from tts import implete
+import asyncio
+from pydub import AudioSegment as audio
+from io import BytesIO
+from datetime import timedelta
+from websockets.exceptions import InvalidStatus,InvalidHandshake
 
 
 class AudioOutputStream():
@@ -19,7 +25,7 @@ class ResultFuture():
     The result of an asynchronous operation.
     """
 
-    def __init__(self, async_handle):
+    def __init__(self, async_handle:asyncio.Task):
         """
         private constructor
         """
@@ -29,12 +35,10 @@ class ResultFuture():
         """
         Waits until the result is available, and returns it.
         """
-        if not self.__resolved:
-            result_handle = self.__get_function(self._handle)
-            if self.__wrapped_type is not None:
-                self.__result = self.__wrapped_type(result_handle)
-            self.__resolved = True
-        return self.__result if self.__wrapped_type is not None else None
+        ret = asyncio.run(self._handle)
+        exc = self._handle.exception
+        return SpeechSynthesisResult(ret,exc)
+                
 
 
 class SpeechSynthesisCancellationDetails():
@@ -42,12 +46,33 @@ class SpeechSynthesisCancellationDetails():
     Contains detailed information about why a result was canceled.
     """
 
-    def __init__(self, result: Optional["SpeechSynthesisResult"] = None):
-        if result is not None:
-            self.__reason = CancellationReason(out_enum.value)
-            self.__error_code = CancellationErrorCode(out_enum.value)
-            self.__error_details = result.properties.get_property(
-                PropertyId.CancellationDetails_ReasonDetailedText)
+    def __init__(self, exc: BaseException):
+        if isinstance(exc, KeyboardInterrupt):
+            self.__reason = CancellationReason.CancelledByUser
+            self.__error_code = CancellationErrorCode.NoError
+        elif isinstance(exc, InvalidStatus):
+            self.__reason = CancellationReason.Error
+            code = exc.response.status_code
+            if code == 429:
+                self.__error_code = CancellationErrorCode.TooManyRequests
+            elif code == 403:
+                self.__error_code = CancellationErrorCode.Forbidden
+            elif code == 500:
+                self.__error_code = CancellationErrorCode.ServiceError
+            elif code == 503:
+                self.__error_code = CancellationErrorCode.ServiceUnavailable
+            else:
+                self.__error_code = CancellationErrorCode.RuntimeError
+        elif isinstance(exc, InvalidHandshake):
+            self.__reason = CancellationReason.Error
+            self.__error_code = CancellationErrorCode.ConnectionFailure
+        elif isinstance(exc,TimeoutError):
+            self.__reason = CancellationReason.Error
+            self.__error_code = CancellationErrorCode.ServiceTimeout
+        else:
+            self.__reason = CancellationReason.Error
+            self.__error_code = CancellationErrorCode.RuntimeError
+        self.__error_details = NotImplemented
 
     @property
     def reason(self) -> CancellationErrorCode:
@@ -69,6 +94,7 @@ class SpeechSynthesisCancellationDetails():
         """
         The error message in case of an unsuccessful speech synthesis (Reason is set to Error)
         """
+        raise NotImplementedError("`error_details` is not implemented. (Maybe available in recent future)")
         return self.__error_details
 
 
@@ -77,17 +103,23 @@ class SpeechSynthesisResult():
     Result of a speech synthesis operation.
     """
 
-    def __init__(self):
+    def __init__(self,ret, exc:Union[BaseException,None]):
         """
         Constructor for internal use.
         """
-        self._result_id = _c_string_buffer.value.decode(encoding='utf-8')
-        self._reason = ResultReason(enum_out.value)
-        self._audio_duration_milliseconds = timedelta(
-            milliseconds=c_duration.value)
-        self._audio_data = buffer
-        self._cancellation_details = SpeechSynthesisCancellationDetails(
-            result=self) if self._reason == ResultReason.Canceled else None
+        if exc is not None:
+            self._reason = ResultReason.Canceled
+            self._result_id = None
+            self._audio_duration_milliseconds = None
+            self._audio_data = None
+            self._cancellation_details = SpeechSynthesisCancellationDetails(exc)
+        else:
+            req_id, data = ret
+            sound:audio = audio.from_mp3(BytesIO(data))
+            self._result_id = req_id
+            self._audio_duration_milliseconds = timedelta(seconds=sound.duration_seconds)
+            self._audio_data = data
+            self._cancellation_details = None
 
     @property
     def cancellation_details(self) -> SpeechSynthesisCancellationDetails:
@@ -102,6 +134,7 @@ class SpeechSynthesisResult():
     def result_id(self) -> str:
         """
         Synthesis result unique ID.
+        Return `None` if cancelled.
         """
         return self._result_id
 
@@ -116,6 +149,7 @@ class SpeechSynthesisResult():
     def audio_data(self) -> bytes:
         """
         The output audio data from the TTS.
+        Return `None` if cancelled.
         """
         return self._audio_data
 
@@ -123,6 +157,7 @@ class SpeechSynthesisResult():
     def audio_duration(self) -> timedelta:
         """
         The time duration of the synthesized audio.
+        Return `None` if cancelled.
 
         .. note::
           Added in version 1.21.0.
@@ -134,7 +169,7 @@ class SpeechSynthesisResult():
         """
         Unsupported
         """
-        raise NotImplementedError("properties unsupported")
+        raise NotImplementedError("`properties` unsupported")
 
     def __str__(self):
         return u'{}(result_id={}, reason={}, audio_length={})'.format(
@@ -204,7 +239,7 @@ class SpeechConfig():
 
 class AudioOutputConfig():
     """
-    Copied from azure.cognitiveservices.audio
+    Copied from azure.cognitiveservices.speech.audio
     Represents specific audio configuration, such as audio output device, file, or custom audio streams
 
     Generates an audio configuration for the speech synthesizer. Only one argument can be
@@ -317,7 +352,8 @@ class SpeechSynthesizer:
         :returns: A future with SpeechSynthesisResult.
         """
         ssml = self._build_ssml(text)
-        return ResultFuture(async_handle, resolve_future, SpeechSynthesisResult)
+        task = asyncio.create_task(implete(ssml))
+        return ResultFuture(task)
 
     def speak_ssml_async(self, ssml: str) -> ResultFuture:
         """

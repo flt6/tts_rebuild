@@ -234,16 +234,13 @@ class ResultReason(Enum):
 class CancellationReason(Enum):
     """
     Defines the possible reasons a recognition result might be canceled.
+    Unsupported reasons is removed.
+    You can refer to `azure.cognitiveservices.speech.enums` for the left ones.
     """
 
     Error = 1
     """
     Indicates that an error occurred during speech recognition.
-    """
-
-    EndOfStream = 2
-    """
-    Indicates that the end of the audio stream was reached.
     """
 
     CancelledByUser = 3
@@ -254,6 +251,8 @@ class CancellationReason(Enum):
 class CancellationErrorCode(Enum):
     """
     Defines error code in case that CancellationReason is Error.
+    Unsupported error is removed.
+    You can refer to `azure.cognitiveservices.speech.enums` for the left ones.
     """
 
     NoError = 0
