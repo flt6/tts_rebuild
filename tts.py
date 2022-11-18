@@ -46,7 +46,7 @@ def _getXTime():
     return "{}-{}-{}T{}:{}:{}.{}Z".format(*n)
 
 # Async function for actually communicating with the websocket
-async def implete(SSML_text) -> bytes:
+async def implete(SSML_text:str,opt_fmt:str) -> bytes:
     req_id = uuid.uuid4().hex.upper()
     Auth_Token = get_token()
     # wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId=577D1E595EEB45979BA26C056A519073
@@ -60,7 +60,7 @@ async def implete(SSML_text) -> bytes:
             _getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_1
         await websocket.send(message_1)
 
-        payload_2 = '{"synthesis":{"audio":{"metadataOptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":false},"outputFormat":"audio-16khz-32kbitrate-mono-mp3"}}}'
+        payload_2 = '{"synthesis":{"audio":{"metadataOptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":false},"outputFormat":"%s"}}}'%opt_fmt
         message_2 = 'Path : synthesis.context\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
             _getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_2
         await websocket.send(message_2)
@@ -90,7 +90,7 @@ async def implete(SSML_text) -> bytes:
                         print("A part of the audio parsed failed!")
             else:
                 break
-        return req_id,audio_stream
+    return req_id,audio_stream
 
 
 def mainSeq(SSML_text:str) -> asyncio.Task:

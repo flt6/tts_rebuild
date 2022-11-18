@@ -25,18 +25,21 @@ class ResultFuture():
     The result of an asynchronous operation.
     """
 
-    def __init__(self, async_handle:asyncio.Task):
+    def __init__(self, task:asyncio.Task,):
         """
         private constructor
         """
-        self._handle = async_handle
+        self._task = task
+        self._task.add_done_callback(self._callback)
 
+    def _callback(self,future:asyncio.Future):
+        pass
     def get(self):
         """
         Waits until the result is available, and returns it.
         """
-        ret = asyncio.run(self._handle)
-        exc = self._handle.exception
+        ret = asyncio.run(self._task)
+        exc = self._task.exception
         return SpeechSynthesisResult(ret,exc)
                 
 
@@ -190,6 +193,8 @@ class SpeechConfig():
     @property
     def speech_synthesis_language(self) -> str:
         """
+        **Not used. I'm wondering what this is for.**
+
         Get speech synthesis language.
         """
         return self._speech_synthesis_language
@@ -361,19 +366,9 @@ class SpeechSynthesizer:
 
         :returns: A future with SpeechSynthesisResult.
         """
-        async_handle = _spx_handle(0)
-        c_ssml = _c_str(ssml)
-        ssml_length = ctypes.c_uint32(len(c_ssml))
-        _call_hr_fn(fn=_sdk_lib.synthesizer_speak_ssml_async, *
-                    [self._handle, c_ssml, ssml_length, ctypes.byref(async_handle)])
-
-        def resolve_future(handle: _spx_handle):
-            result_handle = _spx_handle(0)
-            _call_hr_fn(fn=_sdk_lib.synthesizer_speak_async_wait_for,
-                        *[handle, max_uint32, ctypes.byref(result_handle)])
-            _sdk_lib.synthesizer_async_handle_release(handle)
-            return result_handle
-        return ResultFuture(async_handle, resolve_future, SpeechSynthesisResult)
+        fmt = self._speech_config.speech_synthesis_output_format_string
+        task = asyncio.create_task(implete(ssml,fmt))
+        return ResultFuture(task)
 
     def start_speaking_text(self, text: str) -> SpeechSynthesisResult:
         """
@@ -395,49 +390,35 @@ class SpeechSynthesizer:
         """
         Starts synthesis on plain text in a non-blocking (asynchronous) mode.
 
+        I'm wondering the difference between this and `speak_ssml_async`,
+        I've made this the same as `speak_ssml_async`. If anyone knows that, pleaes pull an Issue.
         :returns: A future with SpeechSynthesisResult.
         """
-        async_handle = _spx_handle(0)
-        c_text = _c_str(text)
-        c_length = ctypes.c_uint32(len(c_text))
-        _call_hr_fn(fn=_sdk_lib.synthesizer_start_speaking_text_async,
-                    *[self._handle, c_text, c_length, ctypes.byref(async_handle)])
-
-        def resolve_future(handle: _spx_handle):
-            result_handle = _spx_handle(0)
-            _call_hr_fn(fn=_sdk_lib.synthesizer_speak_async_wait_for,
-                        *[handle, max_uint32, ctypes.byref(result_handle)])
-            _sdk_lib.synthesizer_async_handle_release(handle)
-            return result_handle
-        return ResultFuture(async_handle, resolve_future, SpeechSynthesisResult)
+        ssml = self._build_ssml(text)
+        task = asyncio.create_task(implete(ssml))
+        return ResultFuture(task)
 
     def start_speaking_ssml_async(self, ssml: str) -> ResultFuture:
         """
         Starts synthesis on ssml in a non-blocking (asynchronous) mode.
 
+        I'm wondering the difference between this and `speak_ssml_async`,
+        I've made this the same as `speak_ssml_async`. If anyone knows that, pleaes pull an Issue.
         :returns: A future with SpeechSynthesisResult.
         """
-        async_handle = _spx_handle(0)
-        c_ssml = _c_str(ssml)
-        c_length = ctypes.c_uint32(len(c_ssml))
-        _call_hr_fn(fn=_sdk_lib.synthesizer_start_speaking_ssml_async,
-                    *[self._handle, c_ssml, c_length, ctypes.byref(async_handle)])
-
-        def resolve_future(handle: _spx_handle):
-            result_handle = _spx_handle(0)
-            _call_hr_fn(fn=_sdk_lib.synthesizer_speak_async_wait_for,
-                        *[handle, max_uint32, ctypes.byref(result_handle)])
-            _sdk_lib.synthesizer_async_handle_release(handle)
-            return result_handle
-        return ResultFuture(async_handle, resolve_future, SpeechSynthesisResult)
+        task = asyncio.create_task(implete(ssml))
+        return ResultFuture(task)
 
     def stop_speaking_async(self):
         """
+        **Not Support**
+
         Asynchronously terminates ongoing synthesis operation.
         This method will stop playback and clear unread data in PullAudioOutputStream.
 
         :returns: A future that is fulfilled once synthesis has been stopped.
         """
+        raise NotImplementedError("This method wasn't support.")
         async_handle = _spx_handle(0)
         _call_hr_fn(fn=_sdk_lib.synthesizer_stop_speaking_async,
                     *[self._handle, ctypes.byref(async_handle)])
@@ -451,6 +432,8 @@ class SpeechSynthesizer:
 
     def stop_speaking(self):
         """
+        **Not Support**
+
         Synchronously terminates ongoing synthesis operation.
         This method will stop playback and clear unread data in PullAudioOutputStream.
         """
@@ -458,11 +441,14 @@ class SpeechSynthesizer:
 
     def get_voices_async(self, locale: str = "") -> ResultFuture:
         """
+        **Not Support**
+
         Get the available voices, asynchronously.
 
         :param locale: Specify the locale of voices, in BCP-47 format; or leave it empty to get all available voices.
         :returns: A task representing the asynchronous operation that gets the voices.
         """
+        raise NotImplementedError("This method wasn't support. You can get this through `azure.cognitiveservices.speech`")
         async_handle = _spx_handle(0)
         c_locale = _c_str(locale)
         _call_hr_fn(fn=_sdk_lib.synthesizer_get_voices_list_async,
@@ -477,22 +463,19 @@ class SpeechSynthesizer:
         return ResultFuture(async_handle, resolve_future, SynthesisVoicesResult)
 
     @property
-    def properties(self) -> PropertyCollection:
+    def properties(self) -> NoReturn:
         """
         A collection of properties and their values defined for this SpeechSynthesizer.
         """
-        return self.__properties
+        raise NotImplementedError("This method wasn't support since most of it is implemented in C++.")
+        # return self.__properties
 
     @property
     def authorization_token(self) -> str:
         """
-        The authorization token that will be used for connecting to the service.
-
-        .. note::
-          The caller needs to ensure that the authorization token is valid. Before the
-          authorization token expires, the caller needs to refresh it by calling this setter with a
-          new valid token. Otherwise, the synthesizer will encounter errors while speech synthesis.
+        We don't need this parameter.
         """
+        raise 
         return self.properties.get_property(PropertyId.SpeechServiceAuthorization_Token)
 
     @authorization_token.setter
