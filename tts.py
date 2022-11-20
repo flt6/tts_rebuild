@@ -5,7 +5,7 @@ import re
 from typing import Optional
 import uuid
 from datetime import datetime
-from time import time
+from time import sleep, time
 
 import requests
 from websockets.legacy import client
@@ -46,9 +46,11 @@ def _getXTime():
     return "{}-{}-{}T{}:{}:{}.{}Z".format(*n)
 
 # Async function for actually communicating with the websocket
-async def implete(SSML_text:str,opt_fmt:str) -> bytes:
+async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
     req_id = uuid.uuid4().hex.upper()
     Auth_Token = get_token()
+    print("Auth_Token: {}".format(Auth_Token))
+    print("req_id: {}".format(req_id))
     # wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId=577D1E595EEB45979BA26C056A519073
     endpoint2 = "wss://eastus.tts.speech.microsoft.com/cognitiveservices/websocket/v1?Authorization=" + \
         Auth_Token + "&X-ConnectionId=" + req_id
@@ -93,17 +95,27 @@ async def implete(SSML_text:str,opt_fmt:str) -> bytes:
     return req_id,audio_stream
 
 
-def mainSeq(SSML_text:str) -> asyncio.Task:
-    return asyncio.create_task(implete(SSML_text))
-    
+class Test:
+    def __init__(self,SSML_text:str):
+        task = self.createTask(SSML_text)
+        task.add_done_callback(self._callback)
+        asyncio.get_event_loop().run_until_complete(task)
+    def createTask(self,SSML_text:str) -> asyncio.Task:
+        return asyncio.get_event_loop().create_task(implete(SSML_text,"audio-16khz-32kbitrate-mono-mp3"))
+    def _callback(self,future:asyncio.Future):
+        ret = future.result()
+        print(ret)
+        _,b = ret
+        with open('output.mp3',"wb") as f:
+            f.write(b)
+
 if __name__ == "__main__":
     SSML_text = '''<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US">
     <voice name="zh-CN-XiaoxiaoNeural">
         wss的v1 接口目
     </voice>
 </speak>'''
-    output_path = 'output.mp3'
-    t = mainSeq(SSML_text)
-    with open('output.mp3',"wb") as f:
-        f.write(t)
+    t = Test(SSML_text)
+    # _,b = asyncio.run(wait(t))
+    
     

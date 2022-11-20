@@ -1,5 +1,46 @@
 from enum import Enum
 
+_SpeechSynthesisOutputFormat: dict[int,str] = {
+    1:  'raw-8khz-8bit-mono-mulaw',
+    2:  'riff-16khz-16kbps-mono-siren',
+    3:  'audio-16khz-16kbps-mono-siren',
+    4:  'audio-16khz-32kbitrate-mono-mp3',
+    5:  'audio-16khz-128kbitrate-mono-mp3',
+    6:  'audio-16khz-64kbitrate-mono-mp3',
+    7:  'audio-24khz-48kbitrate-mono-mp3',
+    8:  'audio-24khz-96kbitrate-mono-mp3',
+    9:  'audio-24khz-160kbitrate-mono-mp3',
+    10: 'raw-16khz-16bit-mono-truesilk',
+    11: 'riff-16khz-16bit-mono-pcm',
+    12: 'riff-8khz-16bit-mono-pcm',
+    13: 'riff-24khz-16bit-mono-pcm',
+    14: 'riff-8khz-8bit-mono-mulaw',
+    15: 'raw-16khz-16bit-mono-pcm',
+    16: 'raw-24khz-16bit-mono-pcm',
+    17: 'raw-8khz-16bit-mono-pcm',
+    18: 'ogg-16khz-16bit-mono-opus',
+    19: 'ogg-24khz-16bit-mono-opus',
+    20: 'raw-48khz-16bit-mono-pcm',
+    21: 'riff-48khz-16bit-mono-pcm',
+    22: 'audio-48khz-96kbitrate-mono-mp3',
+    23: 'audio-48khz-192kbitrate-mono-mp3',
+    24: 'ogg-48khz-16bit-mono-opus',
+    25: 'webm-16khz-16bit-mono-opus',
+    26: 'webm-24khz-16bit-mono-opus',
+    27: 'raw-24khz-16bit-mono-truesilk',
+    28: 'raw-8khz-8bit-mono-alaw',
+    29: 'riff-8khz-8bit-mono-alaw',
+    30: 'webm-24khz-16bit-24kbps-mono-opus',
+    31: 'audio-16khz-16bit-32kbps-mono-opus',
+    32: 'audio-24khz-16bit-48kbps-mono-opus',
+    33: 'audio-24khz-16bit-24kbps-mono-opus',
+    34: 'raw-22050hz-16bit-mono-pcm',
+    35: 'riff-22050hz-16bit-mono-pcm',
+    36: 'raw-44100hz-16bit-mono-pcm',
+    37: 'riff-44100hz-16bit-mono-pcm',
+    38: 'amr-wb-16000hz'
+}
+
 
 class SpeechSynthesisOutputFormat(Enum):
     """
@@ -207,6 +248,7 @@ class SpeechSynthesisOutputFormat(Enum):
     AMR-WB audio at 16kHz sampling rate.
     """
 
+
 class ResultReason(Enum):
     """
     Specifies the possible reasons a recognition result might be generated.
@@ -231,6 +273,7 @@ class ResultReason(Enum):
     Indicates the speech synthesis is now started
     """
 
+
 class CancellationReason(Enum):
     """
     Defines the possible reasons a recognition result might be canceled.
@@ -247,6 +290,7 @@ class CancellationReason(Enum):
     """
     Indicates that request was cancelled by the user.
     """
+
 
 class CancellationErrorCode(Enum):
     """
