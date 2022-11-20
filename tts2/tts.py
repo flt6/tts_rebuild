@@ -49,8 +49,8 @@ def _getXTime():
 async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
     req_id = uuid.uuid4().hex.upper()
     Auth_Token = get_token()
-    print("Auth_Token: {}".format(Auth_Token))
-    print("req_id: {}".format(req_id))
+    # print("Auth_Token: {}".format(Auth_Token))
+    # print("req_id: {}".format(req_id))
     # wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId=577D1E595EEB45979BA26C056A519073
     endpoint2 = "wss://eastus.tts.speech.microsoft.com/cognitiveservices/websocket/v1?Authorization=" + \
         Auth_Token + "&X-ConnectionId=" + req_id

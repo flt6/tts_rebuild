@@ -1,9 +1,9 @@
 from typing import Any, Callable, NoReturn, Optional, Union
-from enums import (SpeechSynthesisOutputFormat, ResultReason,
+from .enums import (SpeechSynthesisOutputFormat, ResultReason,
                    CancellationReason, CancellationErrorCode,
                    _SpeechSynthesisOutputFormat)
 from xml.sax.saxutils import escape
-from tts import implete
+from .tts import implete
 import asyncio
 from pydub import AudioSegment as audio
 from pydub.playback import play

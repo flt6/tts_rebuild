@@ -1,0 +1,9 @@
+setup.py
+tts/__init__.py
+tts/enums.py
+tts/speech.py
+tts/tts.py
+tts.egg-info/PKG-INFO
+tts.egg-info/SOURCES.txt
+tts.egg-info/dependency_links.txt
+tts.egg-info/top_level.txt
