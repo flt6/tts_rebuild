@@ -1,2 +1,6 @@
 __pycache__
 *.mp3
+.vscode
+build
+dist
+my_azure_tts.egg-info
