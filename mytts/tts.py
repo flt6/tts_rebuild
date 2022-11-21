@@ -5,7 +5,7 @@ import re
 from typing import Optional
 import uuid
 from datetime import datetime
-from time import sleep, time
+from time import time
 
 import requests
 from websockets.legacy import client
