@@ -1,4 +1,4 @@
-from tts import SpeechConfig, AudioOutputConfig, SpeechSynthesizer
+from mytts import SpeechConfig, AudioOutputConfig, SpeechSynthesizer
 
 speech_cfg = SpeechConfig()
 audio_cfg = AudioOutputConfig(filename="opt.mp3")
