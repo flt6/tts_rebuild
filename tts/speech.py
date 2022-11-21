@@ -194,8 +194,8 @@ class SpeechConfig():
 
     def __init__(self):
         self._speech_synthesis_language = ""
-        self._speech_synthesis_voice_name = ""
-        self._speech_synthesis_output_format_string = "audio-16khz-32kbitrate-mono-mp3"
+        self._speech_synthesis_voice_name = "zh-CN-XiaoxiaoNeural"
+        self._speech_synthesis_output_format_string = "audio-24khz-48kbitrate-mono-mp3"
 
     @property
     def speech_synthesis_language(self) -> str:
@@ -332,7 +332,7 @@ class SpeechSynthesizer:
         Copied from aspeak.ssml
         Create SSML for text to be spoken.
         """
-        voice = self._speech_config.speech_synthesis_language
+        voice = self._speech_config.speech_synthesis_voice_name
         ssml = '<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" ' \
             'xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"> '
         ssml += f'<voice name="{voice}">' if voice is not None else '<voice>'

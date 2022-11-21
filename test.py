@@ -8,4 +8,5 @@ SSML_text = '''<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="h
         wss的v1 接口目
     </voice>
 </speak>'''
-syn.speak_ssml(SSML_text)
+# syn.speak_ssml(SSML_text)
+syn.speak_text("websocket filename")
