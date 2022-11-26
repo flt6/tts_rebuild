@@ -42,9 +42,12 @@ class ResultFuture():
         """
         Waits until the result is available, and returns it.
         """
-        ret = asyncio.get_event_loop().run_until_complete(self._task)
+        try:
+            ret = asyncio.get_event_loop().run_until_complete(self._task)
+        except Exception:
+            ret = None
         exc = self._task.exception
-        return SpeechSynthesisResult(ret,exc)
+        return SpeechSynthesisResult(ret,exc)  # type: ignore
                 
 
 
@@ -110,7 +113,7 @@ class SpeechSynthesisResult():
     Result of a speech synthesis operation.
     """
 
-    def __init__(self,ret:tuple[str,bytes], exc:Union[BaseException,None]):
+    def __init__(self,ret:Union[tuple[str,bytes],None], exc:Union[BaseException,None]):
         """
         Constructor for internal use.
         """
@@ -121,6 +124,7 @@ class SpeechSynthesisResult():
             self._audio_data = None
             self._cancellation_details = SpeechSynthesisCancellationDetails(exc)
         else:
+            assert ret is not None
             req_id, data = ret
             sound:audio = audio.from_file(BytesIO(data))
             self._result_id = req_id
