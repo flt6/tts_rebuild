@@ -24,7 +24,7 @@ def get_token(force_refresh:Optional[bool]=False) -> str:
         return token
     _token_time = time()
     endpoint1 = "https://azure.microsoft.com/zh-cn/products/cognitive-services/speech-to-text/"
-    r = requests.get(endpoint1)
+    r = requests.get(endpoint1,verify=False)
     main_web_content = r.text
     # They hid the Auth key assignment for the websocket in the main body of the webpage....
     token_expr = re.compile('token: \"(.*?)\"', re.DOTALL)
@@ -49,14 +49,14 @@ def _getXTime():
 async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
     req_id = uuid.uuid4().hex.upper()
     Auth_Token = get_token()
-    # print("Auth_Token: {}".format(Auth_Token))
-    # print("req_id: {}".format(req_id))
     # wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId=577D1E595EEB45979BA26C056A519073
     endpoint2 = "wss://eastus.tts.speech.microsoft.com/cognitiveservices/websocket/v1?Authorization=" + \
         Auth_Token + "&X-ConnectionId=" + req_id
     # 目前该接口没有认证可能很快失效
     # endpoint2 = f"wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId={req_id}"
+    print("Prepare (%s)" % req_id)
     async with client.connect(endpoint2,extra_headers={'Origin':'https://azure.microsoft.com'}) as websocket:
+        print("Connect (%s)"% req_id)
         payload_1 = '{"context":{"system":{"name":"SpeechSDK","version":"1.12.1-rc.1","build":"JavaScript","lang":"JavaScript","os":{"platform":"Browser/Linux x86_64","name":"Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0","version":"5.0 (X11)"}}}}'
         message_1 = 'Path : speech.config\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
             _getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_1
@@ -67,7 +67,6 @@ async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
             _getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_2
         await websocket.send(message_2)
 
-        # payload_3 = '<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"><voice name="' + voice + '"><mstts:express-as style="General"><prosody rate="'+spd+'%" pitch="'+ptc+'%">'+ msg_content +'</prosody></mstts:express-as></voice></speak>'
         payload_3 = SSML_text
         message_3 = 'Path: ssml\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
             _getXTime() + '\r\nContent-Type: application/ssml+xml\r\n\r\n' + payload_3
@@ -78,12 +77,9 @@ async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
         audio_stream:bytes = b''
         while(True):
             response = await websocket.recv()
-            # print('receiving...')
-            # Make sure the message isn't telling us to stop
             if re.search(end_resp_pat, str(response)) is None:
-                # Check if our response is text data or the audio bytes
                 if type(response) == type(bytes()):
-                    # Extract binary data
+                    print("recv ({}) {}".format(req_id,response[:5]))
                     try:
                         needle = b'Path:audio\r\n'
                         start_ind = response.find(needle) + len(needle)
@@ -116,6 +112,3 @@ if __name__ == "__main__":
     </voice>
 </speak>'''
     t = Test(SSML_text)
-    # _,b = asyncio.run(wait(t))
-    
-    
