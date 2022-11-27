@@ -5,6 +5,7 @@ from .enums import (SpeechSynthesisOutputFormat, ResultReason,
 from xml.sax.saxutils import escape
 from .tts import implete
 import asyncio
+from threading import Thread
 from pydub import AudioSegment as audio
 from pydub.playback import play
 from io import BytesIO
@@ -32,18 +33,23 @@ class ResultFuture():
         private constructor
         """
         self._task = task
-        self._task.add_done_callback(self._callback)
         self._handle = handle
+        self._thr = Thread(target=self._wait,args=(asyncio.get_event_loop(),))
+        self._thr.start()
 
-    def _callback(self,future:asyncio.Future):
-        _,b = future.result()
-        self._handle(b)
+    def _wait(self,loop:asyncio.AbstractEventLoop):
+        print("start waiting",self._task)
+        self._ret = loop.run_until_complete(self._task)
+        self._handle(self._ret[1])
+        print("done",self._task)
+    
     def get(self):
         """
         Waits until the result is available, and returns it.
         """
         try:
-            ret = asyncio.get_event_loop().run_until_complete(self._task)
+            self._thr.join()
+            ret = self._ret
         except Exception:
             ret = None
         exc = self._task.exception
@@ -368,6 +374,7 @@ class SpeechSynthesizer:
         """
         ssml = self._build_ssml(text)
         task = asyncio.get_event_loop().create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string))
+        print("Created task: ",task)
         return ResultFuture(task,self._audio_config.handle)
 
     def speak_ssml_async(self, ssml: str) -> ResultFuture:
