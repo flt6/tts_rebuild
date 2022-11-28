@@ -1,4 +1,5 @@
 from mytts import SpeechConfig, AudioOutputConfig, SpeechSynthesizer
+from time import sleep
 
 speech_cfg = SpeechConfig()
 audio_cfg = AudioOutputConfig(filename="opt.mp3")
@@ -9,4 +10,7 @@ SSML_text = '''<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="h
     </voice>
 </speak>'''
 # syn.speak_ssml(SSML_text)
-syn.speak_text("websocket filename")
+syn.speak_text_async("websocket filename")
+syn.speak_text_async("websocket2 filename")
+a=syn.speak_text_async("websocket3 filename")
+print(a.get())

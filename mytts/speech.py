@@ -12,6 +12,18 @@ from io import BytesIO
 from datetime import timedelta
 from websockets.exceptions import InvalidStatus,InvalidHandshake
 
+waiting = False
+def _waiter():
+    global waiting
+    waiting = True
+    def __wait(loop):
+        global waiting
+        print("start waiting")
+        loop.run_forever()
+        waiting = False
+        print("done")
+    Thread(target=__wait, args=(asyncio.get_event_loop(),)).start()
+    
 
 class AudioOutputStream():
     """
@@ -34,25 +46,29 @@ class ResultFuture():
         """
         self._task = task
         self._handle = handle
-        self._thr = Thread(target=self._wait,args=(asyncio.get_event_loop(),))
-        self._thr.start()
+        self._task.add_done_callback(self._callback)
+        if not waiting:
+            _waiter()
 
-    def _wait(self,loop:asyncio.AbstractEventLoop):
-        print("start waiting",self._task)
-        self._ret = loop.run_until_complete(self._task)
-        self._handle(self._ret[1])
-        print("done",self._task)
-    
+    def _callback(self,future:asyncio.Future):
+        if len(asyncio.all_tasks())==0:
+            asyncio.get_event_loop().stop()
+        _,b = future.result()
+        self._handle(b)
+
+    async def _get(self):
+        while not self._task.done():
+            await asyncio.sleep(1)
+        return self._task.result()
     def get(self):
         """
         Waits until the result is available, and returns it.
         """
         try:
-            self._thr.join()
-            ret = self._ret
+            ret = asyncio.run(self._get())
         except Exception:
             ret = None
-        exc = self._task.exception
+        exc = self._task.exception()
         return SpeechSynthesisResult(ret,exc)  # type: ignore
                 
 
@@ -87,6 +103,7 @@ class SpeechSynthesisCancellationDetails():
             self.__error_code = CancellationErrorCode.ServiceTimeout
         else:
             self.__reason = CancellationReason.Error
+            print(exc)
             self.__error_code = CancellationErrorCode.RuntimeError
         self.__error_details = NotImplemented
 
@@ -132,6 +149,7 @@ class SpeechSynthesisResult():
         else:
             assert ret is not None
             req_id, data = ret
+            self._reason = ResultReason.SynthesizingAudioCompleted
             sound:audio = audio.from_file(BytesIO(data))
             self._result_id = req_id
             self._audio_duration_milliseconds = timedelta(seconds=sound.duration_seconds)

@@ -1,5 +1,3 @@
-# 来源 https://github.com/OS984/DiscordBotBackend/blob/3b06b8be39e4dbc07722b0afefeee4c18c136102/NeuralTTS.py
-# A completely innocent attempt to borrow proprietary Microsoft technology for a much better TTS experience
 import asyncio
 import re
 from typing import Optional
@@ -9,6 +7,7 @@ from time import time
 
 import requests
 from websockets.legacy import client
+# from random import randint
 
 token = None
 _token_time = None
@@ -33,9 +32,7 @@ def get_token(force_refresh:Optional[bool]=False) -> str:
 
 # Generate X-Timestamp all correctly formatted
 def _getXTime():
-    # Fix the time to match Americanisms
     hr_cr = lambda hr: str((hr - 1) % 24)
-    # Add zeros in the right places i.e 22:1:5 -> 22:01:05
     fr = lambda x: ":".join(["%02d" % int(i) for i in str(x).split(':')])
 
     now = datetime.now()
@@ -47,6 +44,8 @@ def _getXTime():
 
 # Async function for actually communicating with the websocket
 async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
+    # if randint(0,10)==1:
+    #     raise Exception("Debug")
     req_id = uuid.uuid4().hex.upper()
     Auth_Token = get_token()
     # wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId=577D1E595EEB45979BA26C056A519073
@@ -54,9 +53,9 @@ async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
         Auth_Token + "&X-ConnectionId=" + req_id
     # 目前该接口没有认证可能很快失效
     # endpoint2 = f"wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId={req_id}"
-    print("Prepare (%s)" % req_id)
+    # print("Prepare (%s)" % req_id)
     async with client.connect(endpoint2,extra_headers={'Origin':'https://azure.microsoft.com'}) as websocket:
-        print("Connect (%s)"% req_id)
+        # print("Connect (%s)"% req_id)
         payload_1 = '{"context":{"system":{"name":"SpeechSDK","version":"1.12.1-rc.1","build":"JavaScript","lang":"JavaScript","os":{"platform":"Browser/Linux x86_64","name":"Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0","version":"5.0 (X11)"}}}}'
         message_1 = 'Path : speech.config\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
             _getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_1
@@ -72,14 +71,13 @@ async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
             _getXTime() + '\r\nContent-Type: application/ssml+xml\r\n\r\n' + payload_3
         await websocket.send(message_3)
 
-        # Checks for close connection message
         end_resp_pat = re.compile('Path:turn.end')
         audio_stream:bytes = b''
         while(True):
             response = await websocket.recv()
             if re.search(end_resp_pat, str(response)) is None:
                 if type(response) == type(bytes()):
-                    print("recv ({}) {}".format(req_id,response[:5]))
+                    # print("recv ({}) {}".format(req_id,response[:5]))
                     try:
                         needle = b'Path:audio\r\n'
                         start_ind = response.find(needle) + len(needle)
@@ -88,6 +86,7 @@ async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
                         print("A part of the audio parsed failed!")
             else:
                 break
+        # print("end ({})".format(req_id))
     return req_id,audio_stream
 
 
