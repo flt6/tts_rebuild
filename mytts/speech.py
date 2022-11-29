@@ -20,6 +20,7 @@ except ImportError:
     from traceback import format_exception
     RICH = False
 
+event_loop = asyncio.new_event_loop()
 waiting = False
 def _waiter(status=True):
     '''
@@ -37,10 +38,10 @@ def _waiter(status=True):
         But if you do so, call `asyncio.get_event_loop().close()` when your program is finished,
         otherwise your program will be blocked from exiting.
     '''
-    global waiting
+    global waiting,event_loop
     waiting = True
     def __wait(loop):
-        global waiting
+        global waiting,event_loop
         print("[cyan]start waiting[/]")
         if status and RICH:
             try:
@@ -51,8 +52,9 @@ def _waiter(status=True):
         else:
             loop.run_forever()
         waiting = False
+        event_loop = asyncio.new_event_loop()
         print("done")
-    Thread(target=__wait, args=(asyncio.get_event_loop(),)).start()
+    Thread(target=__wait, args=(event_loop,)).start()
     
 
 class AudioOutputStream():
@@ -82,7 +84,7 @@ class ResultFuture():
 
     def _callback(self,future:asyncio.Future):
         if len(asyncio.all_tasks())==0:
-            asyncio.get_event_loop().stop()
+            event_loop.stop()
 
         exc = future.exception()
         if exc is None:
@@ -449,7 +451,7 @@ class SpeechSynthesizer:
         :returns: A future with SpeechSynthesisResult.
         """
         ssml = self._build_ssml(text)
-        task = asyncio.get_event_loop().create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string,self._debug))
+        task = event_loop.create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string,self._debug))
         if self._debug:
             print("[dark_slate_gray2]Created task: {}[/dark_slate_gray2]".format(task))
         return ResultFuture(task,self._audio_config.handle,self._status)
@@ -460,7 +462,7 @@ class SpeechSynthesizer:
 
         :returns: A future with SpeechSynthesisResult.
         """
-        task = asyncio.get_event_loop().create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string,self._debug))
+        task = event_loop.create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string,self._debug))
         return ResultFuture(task,self._audio_config.handle,self._status)
 
     def start_speaking_text(self, text: str) -> SpeechSynthesisResult:

@@ -48,7 +48,7 @@ async def implete(SSML_text:str,opt_fmt:str,debug:bool) -> tuple[str,bytes]:
 
         You should use `speech.SpeechSynthesizer` instead of this function
     '''
-    raise Exception("Debug")
+    # raise Exception("Debug")
     req_id = uuid.uuid4().hex.upper()
     Auth_Token = get_token()
     # wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId=577D1E595EEB45979BA26C056A519073
