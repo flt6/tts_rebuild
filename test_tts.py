@@ -1,8 +1,11 @@
 from mytts import SpeechConfig, AudioOutputConfig, SpeechSynthesizer
 from mytts import ResultReason, CancellationErrorCode
-from rich import print
 from os import remove
 import pytest
+try:
+    from rich import print
+except ImportError:
+    pass
 
 class Test:
     SSML_text = '''<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US">
