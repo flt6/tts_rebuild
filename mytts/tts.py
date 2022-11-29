@@ -7,7 +7,10 @@ from time import time
 
 import requests
 from websockets.legacy import client
-from rich import print
+try:
+    from rich import print
+except ImportError:
+    print("Rich is not available, please install it for more friendly output.")
 
 token = None
 _token_time = None
