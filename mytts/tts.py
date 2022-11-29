@@ -7,7 +7,7 @@ from time import time
 
 import requests
 from websockets.legacy import client
-# from random import randint
+from rich import print
 
 token = None
 _token_time = None
@@ -17,15 +17,15 @@ def get_token(force_refresh:Optional[bool]=False) -> str:
     global token
     global _token_time
     now = time()
-    if _token_time is not None \
+    if token is not None and\
+        _token_time is not None \
         and _token_time - now < EXPIRE_TIME\
         and not force_refresh:
         return token
     _token_time = time()
     endpoint1 = "https://azure.microsoft.com/zh-cn/products/cognitive-services/speech-to-text/"
-    r = requests.get(endpoint1,verify=False)
+    r = requests.get(endpoint1)
     main_web_content = r.text
-    # They hid the Auth key assignment for the websocket in the main body of the webpage....
     token_expr = re.compile('token: \"(.*?)\"', re.DOTALL)
     token = re.findall(token_expr, main_web_content)[0]
     return token
@@ -42,10 +42,13 @@ def _getXTime():
     ]
     return "{}-{}-{}T{}:{}:{}.{}Z".format(*n)
 
-# Async function for actually communicating with the websocket
-async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
-    # if randint(0,10)==1:
-    #     raise Exception("Debug")
+async def implete(SSML_text:str,opt_fmt:str,debug:bool) -> tuple[str,bytes]:
+    '''
+        Insider function.
+
+        You should use `speech.SpeechSynthesizer` instead of this function
+    '''
+    raise Exception("Debug")
     req_id = uuid.uuid4().hex.upper()
     Auth_Token = get_token()
     # wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId=577D1E595EEB45979BA26C056A519073
@@ -53,9 +56,11 @@ async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
         Auth_Token + "&X-ConnectionId=" + req_id
     # 目前该接口没有认证可能很快失效
     # endpoint2 = f"wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId={req_id}"
-    # print("Prepare (%s)" % req_id)
+    if debug:
+        print("[yellow1]Prepare (%s)[/yellow1]" % req_id)
     async with client.connect(endpoint2,extra_headers={'Origin':'https://azure.microsoft.com'}) as websocket:
-        # print("Connect (%s)"% req_id)
+        if debug:
+            print("[orange1]Connect (%s)[/orange1]"% req_id)
         payload_1 = '{"context":{"system":{"name":"SpeechSDK","version":"1.12.1-rc.1","build":"JavaScript","lang":"JavaScript","os":{"platform":"Browser/Linux x86_64","name":"Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0","version":"5.0 (X11)"}}}}'
         message_1 = 'Path : speech.config\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
             _getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_1
@@ -86,7 +91,8 @@ async def implete(SSML_text:str,opt_fmt:str) -> tuple[str,bytes]:
                         print("A part of the audio parsed failed!")
             else:
                 break
-        # print("end ({})".format(req_id))
+        if debug:
+            print("[slate_blue1]end ({})[/slate_blue1]".format(req_id))
     return req_id,audio_stream
 
 
@@ -96,7 +102,7 @@ class Test:
         task.add_done_callback(self._callback)
         asyncio.get_event_loop().run_until_complete(task)
     def createTask(self,SSML_text:str) -> asyncio.Task:
-        return asyncio.get_event_loop().create_task(implete(SSML_text,"audio-16khz-32kbitrate-mono-mp3"))
+        return asyncio.get_event_loop().create_task(implete(SSML_text,"audio-16khz-32kbitrate-mono-mp3",True))
     def _callback(self,future:asyncio.Future):
         ret = future.result()
         print(ret)
