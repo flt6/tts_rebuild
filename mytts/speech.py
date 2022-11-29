@@ -11,15 +11,45 @@ from pydub.playback import play
 from io import BytesIO
 from datetime import timedelta
 from websockets.exceptions import InvalidStatus,InvalidHandshake
+try:
+    from rich.status import Status
+    from rich import print
+    from rich.traceback import Traceback
+    RICH = True
+except ImportError:
+    from traceback import format_exception
+    RICH = False
 
 waiting = False
-def _waiter():
+def _waiter(status=True):
+    '''
+        Inside method.
+
+        Start synthesising if `SpeechSynthesizer.speak_ssml_async` or `SpeechSynthesizer.speak_text_async`
+        is called.
+
+        :param status: Show a status when any synthesis is running.
+            Powered by `rich.status`, if you use any of `rich.status` or `rich.progress`, you should set
+            this to `False`
+        
+        If you find your synthesis doesn't work after you call `SpeechSynthesizer.speak_ssml_async`
+        or `SpeechSynthesizer.speak_text_async`, you can try to run this in your own code.
+        But if you do so, call `asyncio.get_event_loop().close()` when your program is finished,
+        otherwise your program will be blocked from exiting.
+    '''
     global waiting
     waiting = True
     def __wait(loop):
         global waiting
-        print("start waiting")
-        loop.run_forever()
+        print("[cyan]start waiting[/]")
+        if status and RICH:
+            try:
+                with Status("TTS downloading..."):
+                    loop.run_forever()
+            except Exception:
+                loop.run_forever()
+        else:
+            loop.run_forever()
         waiting = False
         print("done")
     Thread(target=__wait, args=(asyncio.get_event_loop(),)).start()
@@ -40,7 +70,7 @@ class ResultFuture():
     The result of an asynchronous operation.
     """
 
-    def __init__(self, task:asyncio.Task,handle:Callable[[bytes],Any]):
+    def __init__(self, task:asyncio.Task,handle:Callable[[bytes],Any],status:bool):
         """
         private constructor
         """
@@ -48,27 +78,33 @@ class ResultFuture():
         self._handle = handle
         self._task.add_done_callback(self._callback)
         if not waiting:
-            _waiter()
+            _waiter(status)
 
     def _callback(self,future:asyncio.Future):
         if len(asyncio.all_tasks())==0:
             asyncio.get_event_loop().stop()
-        _,b = future.result()
-        self._handle(b)
+
+        exc = future.exception()
+        if exc is None:
+            _,b = future.result()
+            self._handle(b)
 
     async def _get(self):
         while not self._task.done():
             await asyncio.sleep(1)
-        return self._task.result()
     def get(self):
         """
         Waits until the result is available, and returns it.
         """
         try:
-            ret = asyncio.run(self._get())
+            asyncio.run(self._get())
         except Exception:
             ret = None
         exc = self._task.exception()
+        if exc is None:
+            ret = self._task.result()
+        else:
+            ret = None
         return SpeechSynthesisResult(ret,exc)  # type: ignore
                 
 
@@ -95,6 +131,7 @@ class SpeechSynthesisCancellationDetails():
                 self.__error_code = CancellationErrorCode.ServiceUnavailable
             else:
                 self.__error_code = CancellationErrorCode.RuntimeError
+                self._exc = exc.response.status_code
         elif isinstance(exc, InvalidHandshake):
             self.__reason = CancellationReason.Error
             self.__error_code = CancellationErrorCode.ConnectionFailure
@@ -103,7 +140,10 @@ class SpeechSynthesisCancellationDetails():
             self.__error_code = CancellationErrorCode.ServiceTimeout
         else:
             self.__reason = CancellationReason.Error
-            print(exc)
+            if RICH:
+                self._exc = Traceback.from_exception(type(exc),exc,exc.__traceback__)
+            else:
+                self._exc = "\n".join(format_exception(exc))
             self.__error_code = CancellationErrorCode.RuntimeError
         self.__error_details = NotImplemented
 
@@ -121,6 +161,17 @@ class SpeechSynthesisCancellationDetails():
         If Reason is not Error, ErrorCode is set to NoError.
         """
         return self.__error_code
+    
+    @property
+    def exception(self):
+        """
+        If runtime error occurred, this is exception details
+        
+        Possible Values:
+        - server return code: `int`
+        - traceback information: `str` or `rich.traceback.Traceback`
+        """
+        return self._exc
 
     @property
     def error_details(self) -> str:
@@ -342,15 +393,22 @@ class SpeechSynthesizer:
         If it is None, the output audio will be dropped.
         None can be used for scenarios like performance test.
     [NOTSUPPORT]:param auto_detect_source_language_config: The auto detection source language config
+    :param status: Show a status when any synthesis is running.
+        Powered by `rich.status`, if you use any of `rich.status` or `rich.progress`, you should set
+        this to `False`
+    :param debug: Inside debug option, will show debug information when synthesising.
     """
 
     def __init__(self, speech_config: SpeechConfig,
                  audio_config: Optional[AudioOutputConfig] = AudioOutputConfig(
                      use_default_speaker=True),
-                 auto_detect_source_language_config: Optional[AutoDetectSourceLanguageConfig] = None):
+                 auto_detect_source_language_config: Optional[AutoDetectSourceLanguageConfig] = None,
+                 status = True, debug = False):
 
         self._speech_config = speech_config
         self._audio_config:AudioOutputConfig = audio_config  # type: ignore
+        self._debug = debug
+        self._status = status
         if auto_detect_source_language_config is not None:
             raise NotImplementedError(
                 'auto_detect_source_language_config is not supported')
@@ -391,9 +449,10 @@ class SpeechSynthesizer:
         :returns: A future with SpeechSynthesisResult.
         """
         ssml = self._build_ssml(text)
-        task = asyncio.get_event_loop().create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string))
-        print("Created task: ",task)
-        return ResultFuture(task,self._audio_config.handle)
+        task = asyncio.get_event_loop().create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string,self._debug))
+        if self._debug:
+            print("[dark_slate_gray2]Created task: {}[/dark_slate_gray2]".format(task))
+        return ResultFuture(task,self._audio_config.handle,self._status)
 
     def speak_ssml_async(self, ssml: str) -> ResultFuture:
         """
@@ -401,8 +460,8 @@ class SpeechSynthesizer:
 
         :returns: A future with SpeechSynthesisResult.
         """
-        task = asyncio.get_event_loop().create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string))
-        return ResultFuture(task,self._audio_config.handle)
+        task = asyncio.get_event_loop().create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string,self._debug))
+        return ResultFuture(task,self._audio_config.handle,self._status)
 
     def start_speaking_text(self, text: str) -> SpeechSynthesisResult:
         """
