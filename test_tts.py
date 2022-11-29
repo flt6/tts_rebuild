@@ -62,3 +62,10 @@ def cleanup():
     rm()
     yield
     rm()
+if __name__ == "__main__":
+    test = Test()
+    test.test_speak_text_async()
+    test.test_speak_ssml_async()
+    test.test_speak_text()
+    test.test_speak_ssml()
+   
