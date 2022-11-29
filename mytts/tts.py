@@ -88,8 +88,8 @@ async def implete(SSML_text:str,opt_fmt:str,debug:bool) -> tuple[str,bytes]:
                     # print("recv ({}) {}".format(req_id,response[:5]))
                     try:
                         needle = b'Path:audio\r\n'
-                        start_ind = response.find(needle) + len(needle)
-                        audio_stream += response[start_ind:]
+                        start_ind = response.find(needle) + len(needle) # type: ignore
+                        audio_stream += response[start_ind:] # type: ignore
                     except:
                         print("A part of the audio parsed failed!")
             else:
