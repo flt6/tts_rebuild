@@ -14,7 +14,6 @@ from websockets.exceptions import InvalidStatus,InvalidHandshake
 try:
     from rich.status import Status
     from rich import print
-    from rich.traceback import Traceback
     RICH = True
 except ImportError:
     from traceback import format_exception
@@ -143,11 +142,8 @@ class SpeechSynthesisCancellationDetails():
             self.__reason = CancellationReason.Error
             self.__error_code = CancellationErrorCode.ServiceTimeout
         else:
+            self._exc = exc
             self.__reason = CancellationReason.Error
-            if RICH:
-                self._exc = Traceback.from_exception(type(exc),exc,exc.__traceback__)
-            else:
-                self._exc = "\n".join(format_exception(exc))
             self.__error_code = CancellationErrorCode.RuntimeError
         self.__error_details = NotImplemented
 
@@ -173,7 +169,7 @@ class SpeechSynthesisCancellationDetails():
         
         Possible Values:
         - server return code: `int`
-        - traceback information: `str` or `rich.traceback.Traceback`
+        - traceback information: an instance of BaseException
         """
         return self._exc
 
