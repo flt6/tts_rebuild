@@ -109,7 +109,9 @@ class ResultFuture():
         else:
             ret = None
         return SpeechSynthesisResult(ret,exc)  # type: ignore
-                
+     
+    def __str__(self) -> str:
+        return f"<{self.__class__.__name__} done={self._task.done()}>"
 
 
 class SpeechSynthesisCancellationDetails():
@@ -180,7 +182,15 @@ class SpeechSynthesisCancellationDetails():
         """
         raise NotImplementedError("`error_details` is not implemented. (Maybe available in recent future)")
         return self.__error_details
+    
+    def __str__(self) -> str:
+        return f"<SpeechSynthesisCancellationDetails reason={self.reason} error_code={self.error_code}>"
 
+    def __rich_repr__(self):
+        yield f"SpeechSynthesisCancellationDetails"
+        yield self.reason
+        yield self.error_code
+        yield self.exception
 
 class SpeechSynthesisResult():
     """
