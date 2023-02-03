@@ -26,7 +26,7 @@ def get_token(force_refresh:Optional[bool]=False) -> str:
         and not force_refresh:
         return token
     _token_time = time()
-    endpoint1 = "https://azure.microsoft.com/zh-cn/products/cognitive-services/speech-to-text/"
+    endpoint1 = "https://azure.microsoft.com/zh-cn/products/cognitive-services/speech-translation/"
     r = requests.get(endpoint1)
     main_web_content = r.text
     token_expr = re.compile('token: \"(.*?)\"', re.DOTALL)
