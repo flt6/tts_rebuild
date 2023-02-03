@@ -285,6 +285,7 @@ class SpeechConfig():
         self._speech_synthesis_language = ""
         self._speech_synthesis_voice_name = "zh-CN-XiaoxiaoNeural"
         self._speech_synthesis_output_format_string = "audio-24khz-48kbitrate-mono-mp3"
+        self._method = 1
 
     @property
     def speech_synthesis_language(self) -> str:
@@ -336,7 +337,31 @@ class SpeechConfig():
         if not isinstance(format_id, SpeechSynthesisOutputFormat):
             raise TypeError('wrong type, must be SpeechSynthesisOutputFormat')
         self._speech_synthesis_output_format_string = _SpeechSynthesisOutputFormat[format_id.value]
+    
+    @property
+    def method(self) -> int:
+        """
+        The function to connect to the API.
 
+        Possible values:
+        1. Fetch token from a page, and use it like the `azure.cognitiveservices.speech`
+        2. Use the method like the demo page.
+        3. Use the method like Edge Read Aloud(only `webm-24khz-16bit-mono-opus` format is availabe).
+        """
+        return self._method
+    
+    @method.setter
+    def method(self, method:int):
+        """
+        Set the text-to-speech method.
+
+        :param method: This value should be between 1 to 4
+        """
+        if not isinstance(method, int):
+            raise TypeError("wrong type, must be an integer")
+        if method < 1 or method > 4:
+            raise ValueError("method must be between 1 to 4")
+        self._method = method
 
 class AudioOutputConfig():
     """
@@ -459,10 +484,21 @@ class SpeechSynthesizer:
         :returns: A future with SpeechSynthesisResult.
         """
         ssml = self._build_ssml(text)
-        task = event_loop.create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string,self._debug))
+        task = event_loop.create_task(
+            implete(
+                ssml,
+                self._speech_config.speech_synthesis_output_format_string,
+                self._debug,
+                self._speech_config.method
+                )
+            )
         if self._debug:
             print("[dark_slate_gray2]Created task: {}[/dark_slate_gray2]".format(task))
-        return ResultFuture(task,self._audio_config.handle,self._status,self._debug)
+        return ResultFuture(
+            task,
+            self._audio_config.handle,
+            self._status,self._debug
+        )
 
     def speak_ssml_async(self, ssml: str) -> ResultFuture:
         """
@@ -470,8 +506,19 @@ class SpeechSynthesizer:
 
         :returns: A future with SpeechSynthesisResult.
         """
-        task = event_loop.create_task(implete(ssml,self._speech_config.speech_synthesis_output_format_string,self._debug))
-        return ResultFuture(task,self._audio_config.handle,self._status,self._debug)
+        task = event_loop.create_task(
+            implete(
+                ssml,
+                self._speech_config.speech_synthesis_output_format_string,
+                self._debug,
+                self._speech_config.method
+                )
+            )
+        return ResultFuture(
+            task,
+            self._audio_config.handle,
+            self._status,self._debug
+        )
 
     def start_speaking_text(self, text: str) -> SpeechSynthesisResult:
         """
