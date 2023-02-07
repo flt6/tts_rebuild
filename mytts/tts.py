@@ -3,6 +3,7 @@ import re
 from typing import Optional
 import uuid
 from datetime import datetime
+from subprocess import PIPE, Popen
 from time import time
 import logging
 
@@ -36,8 +37,9 @@ def get_token(force_refresh:Optional[bool]=False) -> str:
     r = requests.get(endpoint1)
     r.raise_for_status()
     main_web_content = r.text
-    token_expr = re.compile('token: \"(.*?)\"', re.DOTALL)
-    token = re.findall(token_expr, main_web_content)[0]
+    token = re.search(r'token:\ "(.*)",', main_web_content)
+    assert token is not None
+    token = token.group(1)
     return token
 
 # Generate X-Timestamp all correctly formatted
@@ -52,12 +54,13 @@ def _getXTime():
     ]
     return "{}-{}-{}T{}:{}:{}.{}Z".format(*n)
 
-async def implete(SSML_text:str,opt_fmt:str,debug:bool,method:int=1) -> tuple[str,bytes]:
+async def implete(SSML_text:str,opt_fmt:str,debug:bool,method:int=1) -> tuple[bool,str,bytes]:
     '''
         Insider function.
 
         You should use `speech.SpeechSynthesizer` instead of this function
     '''
+    old_fmt = None
     log_handler.setLevel(logging.DEBUG if debug else logging.INFO)
     req_id = uuid.uuid4().hex.upper()
     log.debug("method=%d" % method)
@@ -79,12 +82,13 @@ async def implete(SSML_text:str,opt_fmt:str,debug:bool,method:int=1) -> tuple[st
             log.debug("RE",exc_info=e)
             return await implete(SSML_text,opt_fmt,debug,2)
     elif method == 2:
-        endpoint2 = f"wss://eastus.api.speech.mic4rosoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId={req_id}"
+        endpoint2 = f"wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId={req_id}"
         headers = {'Origin':'https://azure.microsoft.com'}
     elif method == 3:
         endpoint2 = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4"
         headers = {'Origin':'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold'}
         if opt_fmt!="webm-24khz-16bit-mono-opus":
+            old_fmt = opt_fmt
             opt_fmt = "webm-24khz-16bit-mono-opus"
             log.warning("method to 3, only 'webm-24khz-16bit-mono-opus' is supported.")
     else:
@@ -125,6 +129,60 @@ async def implete(SSML_text:str,opt_fmt:str,debug:bool,method:int=1) -> tuple[st
                 else:
                     break
             log.debug("end ({})".format(req_id))
+        
+        if old_fmt is not None:
+            unsupport = [
+                "raw-16khz-16bit-mono-truesilk",
+                "raw-24khz-16bit-mono-truesilk",
+                "raw-8khz-8bit-mono-alaw"
+            ]
+            if old_fmt == "raw-8khz-8bit-mono-mulaw":
+                fmt = "mulaw"
+            elif "mp3" in old_fmt:
+                fmt = "mp3"
+            elif old_fmt in \
+                [
+                    "raw-16khz-16bit-mono-pcm",
+                    "raw-24khz-16bit-mono-pcm", 
+                    "raw-8khz-16bit-mono-pcm",
+                    "raw-48khz-16bit-mono-pcm", 
+                    "raw-22050hz-16bit-mono-pcm", 
+                    "raw-44100hz-16bit-mono-pcm"
+                ]:
+                fmt = "u16be"
+            elif old_fmt == "riff-24khz-16bit-mono-pcm":
+                fmt = "u24be"
+            elif old_fmt == "riff-8khz-8bit-mono-mulaw":
+                fmt = "u8"
+            elif "ogg" in old_fmt:
+                fmt = "ogg"
+            elif "webm" in old_fmt:
+                fmt = "webm"
+            elif "riff" in old_fmt:
+                fmt = "wav"
+            elif "opus" in old_fmt:
+                fmt = "opus"
+            elif old_fmt == "amr-wb-16000hz":
+                fmt = "amr"
+            elif old_fmt in unsupport:
+                print(f"[red]Can't convert webm to {old_fmt}! Only convert to mp3.[/red]")
+                fmt = "mp3"
+            else:
+                assert "Should never run this", old_fmt
+
+            cmd=[
+                "ffmpeg",
+                "-hide_banner",
+                "-i",
+                "-",
+                "-f",
+                fmt,
+                "-"
+            ]
+            pop = Popen(cmd,stdin=PIPE,stdout=PIPE,stderr=PIPE)
+            audio_stream,err=pop.communicate(audio_stream)
+            log.debug(err.decode())
+
         return req_id,audio_stream
     except Exception as e:
         log.error("An unexpected exception occurred. If this error kept going, please make an Issue on github with code %d"%method)
