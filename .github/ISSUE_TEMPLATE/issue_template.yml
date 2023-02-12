@@ -11,16 +11,16 @@ body:
     id: latest
     attributes:
       label: Have you retry with the latest version by cloning the github
-      description: Install it with `pip install git+https://github.com/flt6/tts_rebuild`
       options:
-        - Checked
+        - label: Install it with `pip install --upgrade git+https://github.com/flt6/tts_rebuild` and retry
+          required: true
     validations:
       required: true
-  - type: checkboxes
+  - type: Dropdown
     id: error_code
     attributes:
       label: What is the error code?
-      required: like `An unexpected exception occurred. If this error kept going, please make an Issue on github with code 1`
+      description: like `An unexpected exception occurred. If this error kept going, please make an Issue on github with code 1`
       options:
         - 1
         - 2
@@ -31,7 +31,7 @@ body:
       label: The min code to reproduce the error
     validations:
       required: true
-  - type: checkboxes
+  - type: Dropdown
     id: platform
     attributes:
       label: Platform
