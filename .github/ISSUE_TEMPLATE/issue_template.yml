@@ -16,7 +16,7 @@ body:
           required: true
     validations:
       required: true
-  - type: Dropdown
+  - type: dropdown
     id: error_code
     attributes:
       label: What is the error code?
@@ -31,7 +31,7 @@ body:
       label: The min code to reproduce the error
     validations:
       required: true
-  - type: Dropdown
+  - type: dropdown
     id: platform
     attributes:
       label: Platform
