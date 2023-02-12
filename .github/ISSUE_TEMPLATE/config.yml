@@ -1,0 +1,44 @@
+name: Bug Report
+description: The library can't run correctly.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: checkboxes
+    id: latest
+    attributes:
+      label: Have you retry with the latest version by cloning the github
+      description: Install it with `pip install git+https://github.com/flt6/tts_rebuild`
+      options:
+        - Checked
+    validations:
+      required: true
+  - type: checkboxes
+    id: error_code
+    attributes:
+      label: What is the error code?
+      required: like `An unexpected exception occurred. If this error kept going, please make an Issue on github with code 1`
+      options:
+        - 1
+        - 2
+        - 3
+  - type: textarea
+    id: code
+    attributes:
+      label: The min code to reproduce the error
+    validations:
+      required: true
+  - type: checkboxes
+    id: platform
+    attributes:
+      label: Platform
+      description: On what platform your error occurred.
+      options:
+        - Windows
+        - Linux
+        - Mac OS
+    validations:
+      required: true
