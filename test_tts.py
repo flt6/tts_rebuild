@@ -36,6 +36,28 @@ class Test:
         syn = SpeechSynthesizer(speech_cfg,audio_cfg,debug=True)
         t = syn.speak_ssml_async(self.SSML_text)
         self.check(t.get())
+    def test_speak_method2(self):
+        speech_cfg = SpeechConfig()
+        speech_cfg.method=2
+        audio_cfg = AudioOutputConfig(filename="opt5.mp3")
+        syn = SpeechSynthesizer(speech_cfg,audio_cfg,debug=True)
+        t = syn.speak_ssml_async(self.SSML_text)
+        self.check(t.get())
+    def test_mult_voice(self):
+        SSML_text = '''<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US">
+            <voice name="zh-CN-XiaoyiNeural">
+                wss的v1 接口目云希
+            </voice>
+            <voice name="zh-CN-XiaoxiaoNeural">
+                wss的v1 接口目晓晓
+            </voice>
+        </speak>'''
+        speech_cfg = SpeechConfig()
+        speech_cfg.method=1
+        audio_cfg = AudioOutputConfig(filename="opt6.mp3")
+        syn = SpeechSynthesizer(speech_cfg,audio_cfg,debug=True)
+        t = syn.speak_ssml_async(SSML_text)
+        self.check(t.get())
 
     def check(self,rst):
         if rst.reason!=ResultReason.SynthesizingAudioCompleted:
@@ -59,6 +81,8 @@ def cleanup():
         remove("opt2.mp3")
         remove("opt3.mp3")
         remove("opt4.mp3")
+        remove("opt5.mp3")
+        remove("opt6.mp3")
     rm()
     yield
     rm()
@@ -68,5 +92,4 @@ if __name__ == "__main__":
     test.test_speak_ssml_async()
     test.test_speak_text()
     test.test_speak_ssml()
-    
-   
+    test.test_speak_method2()
