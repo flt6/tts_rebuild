@@ -60,7 +60,7 @@ async def implete(SSML_text:str,opt_fmt:str,debug:bool,method:int=1) -> tuple[bo
 
         You should use `speech.SpeechSynthesizer` instead of this function
     '''
-    old_fmt = None
+    method = 2
     log_handler.setLevel(logging.DEBUG if debug else logging.INFO)
     req_id = uuid.uuid4().hex.upper()
     log.debug("method=%d" % method)
@@ -82,15 +82,20 @@ async def implete(SSML_text:str,opt_fmt:str,debug:bool,method:int=1) -> tuple[bo
             log.debug("RE",exc_info=e)
             return await implete(SSML_text,opt_fmt,debug,2)
     elif method == 2:
-        endpoint2 = f"wss://eastus.api.speech.microsoft.com/cognitiveservices/websocket/v1?TrafficType=AzureDemo&Authorization=bearer%20undefined&X-ConnectionId={req_id}"
-        headers = {'Origin':'https://azure.microsoft.com'}
-    elif method == 3:
         endpoint2 = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4"
-        headers = {'Origin':'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold'}
-        if opt_fmt!="webm-24khz-16bit-mono-opus":
-            old_fmt = opt_fmt
-            opt_fmt = "webm-24khz-16bit-mono-opus"
-            log.warning("method to 3, only 'webm-24khz-16bit-mono-opus' is supported.")
+        # headers = {'Origin':'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold'}
+        if opt_fmt != "audio-24khz-48kbitrate-mono-mp3":
+            log.warning("Only type `audio-24khz-48kbitrate-mono-mp3` is allowed.")
+        if SSML_text.count("</voice>")>=2:
+            raise ValueError("Mutiple <voice> tag is not supported.")
+        headers = {
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache",
+            "Origin": "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "en-US,en;q=0.9",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36 Edg/91.0.864.41"
+        }
     else:
         raise ValueError(f"Method must between 1 to 3, but '{method}' got. If you haven't specified 'method', this is because of all the methods failed. If so, please make an Issue.")
     
@@ -99,26 +104,27 @@ async def implete(SSML_text:str,opt_fmt:str,debug:bool,method:int=1) -> tuple[bo
     try:
         async with client.connect(endpoint2,extra_headers=headers) as websocket:
             log.debug("Connect (%s)"% req_id)
-            payload_1 = '{"context":{"system":{"name":"SpeechSDK","version":"1.12.1-rc.1","build":"JavaScript","lang":"JavaScript","os":{"platform":"Browser/Linux x86_64","name":"Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0","version":"5.0 (X11)"}}}}'
-            message_1 = 'Path : speech.config\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
-                _getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_1
+            message_1 = \
+                f"X-Timestamp:{_getXTime()}\r\n"\
+                "Content-Type:application/json; charset=utf-8\r\n"\
+                "Path:speech.config\r\n"\
+                "\r\n"\
+                '{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":false},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}'
             await websocket.send(message_1)
 
-            payload_2 = '{"synthesis":{"audio":{"metadataOptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":false},"outputFormat":"%s"}}}'%opt_fmt
-            message_2 = 'Path : synthesis.context\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
-                _getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_2
+            message_2 = \
+                f"X-RequestId:{req_id}\r\n"\
+                "Content-Type:application/ssml+xml\r\n"\
+                f"X-Timestamp:{_getXTime()}Z\r\n"\
+                "Path:ssml\r\n\r\n"\
+                f"{SSML_text}"
             await websocket.send(message_2)
 
-            payload_3 = SSML_text
-            message_3 = 'Path: ssml\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
-                _getXTime() + '\r\nContent-Type: application/ssml+xml\r\n\r\n' + payload_3
-            await websocket.send(message_3)
-
-            end_resp_pat = re.compile('Path:turn.end')
             audio_stream:bytes = b''
             while(True):
                 response = await websocket.recv()
-                if re.search(end_resp_pat, str(response)) is None:
+                # print(str(response))
+                if "Path:turn.end" not in str(response):
                     if type(response) == type(bytes()):
                         try:
                             needle = b'Path:audio\r\n'
@@ -129,61 +135,7 @@ async def implete(SSML_text:str,opt_fmt:str,debug:bool,method:int=1) -> tuple[bo
                 else:
                     break
             log.debug("end ({})".format(req_id))
-        
-        if old_fmt is not None:
-            unsupport = [
-                "raw-16khz-16bit-mono-truesilk",
-                "raw-24khz-16bit-mono-truesilk",
-                "raw-8khz-8bit-mono-alaw"
-            ]
-            if old_fmt == "raw-8khz-8bit-mono-mulaw":
-                fmt = "mulaw"
-            elif "mp3" in old_fmt:
-                fmt = "mp3"
-            elif old_fmt in \
-                [
-                    "raw-16khz-16bit-mono-pcm",
-                    "raw-24khz-16bit-mono-pcm", 
-                    "raw-8khz-16bit-mono-pcm",
-                    "raw-48khz-16bit-mono-pcm", 
-                    "raw-22050hz-16bit-mono-pcm", 
-                    "raw-44100hz-16bit-mono-pcm"
-                ]:
-                fmt = "u16be"
-            elif old_fmt == "riff-24khz-16bit-mono-pcm":
-                fmt = "u24be"
-            elif old_fmt == "riff-8khz-8bit-mono-mulaw":
-                fmt = "u8"
-            elif "ogg" in old_fmt:
-                fmt = "ogg"
-            elif "webm" in old_fmt:
-                fmt = "webm"
-            elif "riff" in old_fmt:
-                fmt = "wav"
-            elif "opus" in old_fmt:
-                fmt = "opus"
-            elif old_fmt == "amr-wb-16000hz":
-                fmt = "amr"
-            elif old_fmt in unsupport:
-                print(f"[red]Can't convert webm to {old_fmt}! Only convert to mp3.[/red]")
-                fmt = "mp3"
-            else:
-                assert "Should never run this", old_fmt
-
-            cmd=[
-                "ffmpeg",
-                "-hide_banner",
-                "-i",
-                "-",
-                "-f",
-                fmt,
-                "-"
-            ]
-            pop = Popen(cmd,stdin=PIPE,stdout=PIPE,stderr=PIPE)
-            audio_stream,err=pop.communicate(audio_stream)
-            log.debug(err.decode())
-
-        return req_id,audio_stream
+            return req_id, audio_stream
     except Exception as e:
         log.error("An unexpected exception occurred. If this error kept going, please make an Issue on github with code %d"%method)
         log.info("We will use the backup method.")
@@ -200,7 +152,6 @@ class Test:
         return asyncio.get_event_loop().create_task(implete(SSML_text,"audio-16khz-32kbitrate-mono-mp3",True))
     def _callback(self,future:asyncio.Future):
         ret = future.result()
-        print(ret)
         _,b = ret
         with open('output.mp3',"wb") as f:
             f.write(b)
